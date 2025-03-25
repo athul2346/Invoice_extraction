@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pdfplumber
+torch
+transformers
+pydantic
