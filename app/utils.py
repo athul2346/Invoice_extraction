@@ -3,6 +3,10 @@ import re
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from io import BytesIO
+from datetime import datetime
+from sqlalchemy.orm import Session
+from datetime import datetime   
+from models import Invoice                                                                                                                                                                                                                                                                                                                                                                                                                                 
 
 # Load Qwen model
 MODEL_NAME = "Qwen/Qwen2.5-Coder-7B-Instruct"
@@ -58,3 +62,28 @@ def generate_invoice_category(extracted_text: str) ->str:
         output_tokens = model.generate(**inputs, max_length=4096, temperature=0.2)
     
     return tokenizer.decode(output_tokens[0], skip_special_tokens=True).strip()
+
+def detect_duplicate_invoice(db: Session, invoice_number: str, vendor: str) -> bool:
+    """Check if an invoice with the same number and vendor exists in the database."""
+    existing_invoice = db.query(Invoice).filter(
+        Invoice.invoice_number == invoice_number,
+        Invoice.vendor == vendor
+    ).first()
+    return existing_invoice is not None
+
+
+def detect_amount_anomaly(previous_amount: float, current_amount: float) -> bool:
+    """Detects sudden large deviations in invoice amounts."""
+    if previous_amount == 0:
+        return False
+    change_percent = abs((current_amount - previous_amount) / previous_amount) * 100
+    return change_percent > 50  # Flag if amount changes by more than 50%
+
+
+def detect_date_anomaly(invoice_date: str) -> bool:
+    """Detects if an invoice date is in the future."""
+    try:
+        invoice_date_obj = datetime.strptime(invoice_date, "%Y-%m-%d")
+        return invoice_date_obj > datetime.now()  # Flag future-dated invoices
+    except ValueError:
+        return True  # Flag invalid date formats
